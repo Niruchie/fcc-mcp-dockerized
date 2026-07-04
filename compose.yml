@@ -1,0 +1,19 @@
+services:
+  free-claude-code:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: free-claude-code
+    ports:
+      - "8082:8082"
+    environment:
+      FCC_ADMIN_ALLOW_NON_LOOPBACK: "true"
+      FCC_OPEN_BROWSER: "false"
+    volumes:
+      - fcc_data:/root/.fcc
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  fcc_data:

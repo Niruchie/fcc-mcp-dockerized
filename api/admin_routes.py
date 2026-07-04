@@ -60,7 +60,15 @@ def _origin_is_local(origin: str | None) -> bool:
 
 
 def require_loopback_admin(request: Request) -> None:
-    """Allow admin access only from the local machine."""
+    """Allow admin access only from the local machine.
+
+    When FCC_ADMIN_ALLOW_NON_LOOPBACK is true, the loopback check is
+    skipped so the admin UI works behind a Docker published port.
+    """
+
+    settings = get_cached_settings()
+    if settings.fcc_admin_allow_non_loopback:
+        return
 
     client_host = request.client.host if request.client else None
     if not _is_loopback_host(client_host):
@@ -130,6 +138,17 @@ async def apply_admin_config(
     request.app.state.provider_runtime = ProviderRuntime(get_cached_settings())
     request.app.state.admin_pending_fields = result["pending_fields"]
     return result
+
+
+@router.get("/admin/api/models")
+async def admin_models(request: Request):
+    require_loopback_admin(request)
+    runtime = getattr(request.app.state, "provider_runtime", None)
+    if isinstance(runtime, ProviderRuntime):
+        models = sorted(runtime.cached_prefixed_model_refs())
+    else:
+        models = []
+    return {"models": models}
 
 
 @router.get("/admin/api/status")

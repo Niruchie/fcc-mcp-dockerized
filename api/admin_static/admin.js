@@ -86,6 +86,7 @@ async function load() {
   byId("configPath").textContent = config.paths.managed;
   await validate(false);
   await refreshLocalStatus();
+  await syncModels();
   updateDirtyState();
   showMessage("");
 }
@@ -447,6 +448,14 @@ async function testProvider(providerId, button) {
   } finally {
     button.disabled = false;
     button.textContent = original;
+  }
+}
+
+async function syncModels() {
+  const result = await api("/admin/api/models");
+  if (result.models) {
+    state.modelOptions = Array.from(new Set(result.models)).sort();
+    syncModelDatalist();
   }
 }
 

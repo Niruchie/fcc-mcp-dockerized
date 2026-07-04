@@ -248,6 +248,10 @@ class Settings(BaseSettings):
     # ==================== Server ====================
     host: str = "0.0.0.0"
     port: int = 8082
+    fcc_admin_allow_non_loopback: bool = Field(
+        default=False, validation_alias="FCC_ADMIN_ALLOW_NON_LOOPBACK"
+    )
+
     # Optional server API key to protect endpoints (Anthropic-style)
     # Set via env `ANTHROPIC_AUTH_TOKEN`. When empty, no auth is required.
     anthropic_auth_token: str = Field(

@@ -20,6 +20,9 @@ from core.trace import extract_claude_session_id_from_headers, trace_event
 from providers.exceptions import ProviderError
 
 from .admin_routes import router as admin_router
+from .mcp_events import get_event_bus
+from .mcp_server import init_mcp
+from .mcp_server import mcp as mcp_app
 from .routes import router
 from .runtime import AppRuntime, startup_failure_message
 from .validation_log import summarize_request_validation_body
@@ -31,8 +34,16 @@ async def lifespan(app: FastAPI):
     runtime = AppRuntime.for_app(app, settings=get_settings())
     await runtime.startup()
 
+    init_mcp(
+        provider_runtime=app.state.provider_runtime,
+        settings=runtime.settings,
+        messaging_runtime=getattr(runtime, "messaging_runtime", None),
+    )
+    get_event_bus().emit("server.started")
+
     yield
 
+    get_event_bus().emit("server.stopping")
     await runtime.shutdown()
 
 
@@ -68,12 +79,19 @@ class GracefulLifespanApp:
                         }
                     )
                     return
+                init_mcp(
+                    provider_runtime=self.app.state.provider_runtime,
+                    settings=settings,
+                    messaging_runtime=getattr(runtime, "messaging_runtime", None),
+                )
+                get_event_bus().emit("server.started")
                 startup_complete = True
                 await send({"type": "lifespan.startup.complete"})
                 continue
 
             if message["type"] == "lifespan.shutdown":
                 if startup_complete:
+                    get_event_bus().emit("server.stopping")
                     try:
                         await runtime.shutdown()
                     except Exception as exc:
@@ -113,6 +131,9 @@ def create_app(*, lifespan_enabled: bool = True) -> FastAPI:
     # Register routes
     app.include_router(admin_router)
     app.include_router(router)
+
+    # Mount MCP server at /mcp (SSE transport)
+    app.mount("/mcp", mcp_app.http_app(transport="sse"))
 
     # Exception handlers
     @app.exception_handler(RequestValidationError)
